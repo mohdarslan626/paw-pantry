@@ -1,7 +1,7 @@
 
 from datetime import datetime, timezone
 from uuid import UUID
-
+from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.models.models import Brand, Category, Product, ProductStatus
@@ -25,6 +25,8 @@ def list_products_service(
     limit: int = 20,
     search: str | None = None,
     category_id: int | None = None,
+    min_price: Decimal | None = None,
+    max_price: Decimal | None = None,
     sort_by: str = "name",
     sort_order: str = "asc",
 ) -> list[Product]:
@@ -35,6 +37,8 @@ def list_products_service(
         limit=limit,
         search=search,
         category_id=category_id,
+        min_price=min_price,
+        max_price=max_price,
         sort_by=sort_by,
         sort_order=sort_order,
     )

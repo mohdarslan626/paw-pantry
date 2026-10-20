@@ -1,7 +1,7 @@
 
 from uuid import UUID
-
-from sqlalchemy import select
+from decimal import Decimal
+from sqlalchemy import and_, exists, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.models import Product, ProductStatus, ProductVariant
@@ -44,6 +44,8 @@ def list_products(
     category_id: int | None = None,
     sort_by: str = "name",
     sort_order: str = "asc",
+    min_price: Decimal | None = None,
+    max_price: Decimal | None = None,
 ) -> list[Product]:
     statement = select(Product).where(
         Product.deleted_at.is_(None)
@@ -66,10 +68,43 @@ def list_products(
         statement = statement.where(
             Product.category_id == category_id
         )
+  
+    if min_price is not None or max_price is not None:
+        price_conditions = [
+            ProductVariant.product_id == Product.id,
+            ProductVariant.is_active.is_(True),
+            ProductVariant.deleted_at.is_(None),
+        ]
+
+        if min_price is not None:
+            price_conditions.append(ProductVariant.price >= min_price)
+
+        if max_price is not None:
+            price_conditions.append(ProductVariant.price <= max_price)
+
+        statement = statement.where(
+            exists(
+                select(ProductVariant.id).where(
+                    and_(*price_conditions)
+                )
+            )
+        )
+
+    variant_price = (
+        select(func.min(ProductVariant.price))
+        .where(
+            ProductVariant.product_id == Product.id,
+            ProductVariant.is_active.is_(True),
+            ProductVariant.deleted_at.is_(None),
+        )
+        .correlate(Product)
+        .scalar_subquery()
+    )
 
     sort_columns = {
         "name": Product.name,
         "created_at": Product.created_at,
+        "price": variant_price
     }
     sort_column = sort_columns[sort_by]
 

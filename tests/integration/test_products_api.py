@@ -351,3 +351,253 @@ def test_public_can_sort_products_by_name(
     assert response.status_code == 200
     names = [item["name"] for item in response.json()]
     assert names == sorted(names)
+
+
+def test_public_can_filter_products_by_price_range(
+    client, db_session, product_category
+):
+    matching = Product(
+        category_id=product_category.id,
+        name="Price Match Dog Food",
+        slug=f"price-match-{uuid.uuid4().hex[:8]}",
+        status=ProductStatus.ACTIVE,
+    )
+    outside_range = Product(
+        category_id=product_category.id,
+        name="Expensive Dog Food",
+        slug=f"expensive-food-{uuid.uuid4().hex[:8]}",
+        status=ProductStatus.ACTIVE,
+    )
+    inactive_match = Product(
+        category_id=product_category.id,
+        name="Inactive Variant Food",
+        slug=f"inactive-food-{uuid.uuid4().hex[:8]}",
+        status=ProductStatus.ACTIVE,
+    )
+    db_session.add_all([matching, outside_range, inactive_match])
+    db_session.flush()
+
+    db_session.add_all([
+        ProductVariant(
+            product_id=matching.id,
+            sku=f"MATCH-1-{uuid.uuid4().hex[:8]}",
+            variant_name="1 kg",
+            weight_grams=1000,
+            price=499.00,
+            currency="INR",
+            is_active=True,
+        ),
+        ProductVariant(
+            product_id=matching.id,
+            sku=f"MATCH-3-{uuid.uuid4().hex[:8]}",
+            variant_name="3 kg",
+            weight_grams=3000,
+            price=1299.00,
+            currency="INR",
+            is_active=True,
+        ),
+        ProductVariant(
+            product_id=outside_range.id,
+            sku=f"EXPENSIVE-{uuid.uuid4().hex[:8]}",
+            variant_name="7 kg",
+            weight_grams=7000,
+            price=2499.00,
+            currency="INR",
+            is_active=True,
+        ),
+        ProductVariant(
+            product_id=inactive_match.id,
+            sku=f"INACTIVE-{uuid.uuid4().hex[:8]}",
+            variant_name="1 kg",
+            weight_grams=1000,
+            price=999.00,
+            currency="INR",
+            is_active=False,
+        ),
+    ])
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/products/?min_price=500&max_price=1500"
+    )
+
+    assert response.status_code == 200
+    results = response.json()
+    result_ids = [item["id"] for item in results]
+
+    # One active variant matches the range.
+    assert str(matching.id) in result_ids
+
+    # A product with no matching active variant is excluded.
+    assert str(outside_range.id) not in result_ids
+    assert str(inactive_match.id) not in result_ids
+
+    # Multiple variants must not duplicate the product.
+    assert result_ids.count(str(matching.id)) == 1
+
+
+def test_public_price_filter_includes_range_boundaries(
+    client, db_session, product_category
+):
+    products = []
+    for name, price in [
+        ("Minimum Price Food", 500.00),
+        ("Maximum Price Food", 1500.00),
+    ]:
+        product = Product(
+            category_id=product_category.id,
+            name=name,
+            slug=f"{name.lower().replace(' ', '-')}-{uuid.uuid4().hex[:8]}",
+            status=ProductStatus.ACTIVE,
+        )
+        db_session.add(product)
+        db_session.flush()
+
+        db_session.add(
+            ProductVariant(
+                product_id=product.id,
+                sku=f"BOUNDARY-{uuid.uuid4().hex[:8]}",
+                variant_name="1 kg",
+                weight_grams=1000,
+                price=price,
+                currency="INR",
+                is_active=True,
+            )
+        )
+        products.append(product)
+
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/products/?min_price=500&max_price=1500"
+    )
+
+    assert response.status_code == 200
+    result_ids = [item["id"] for item in response.json()]
+
+    assert all(str(product.id) in result_ids for product in products)
+
+
+def test_public_price_filter_rejects_minimum_above_maximum(client):
+    response = client.get(
+        "/api/v1/products/?min_price=1500&max_price=500"
+    )
+
+    assert response.status_code == 422
+    assert "min_price must be less than or equal to max_price" in (
+        response.json()["detail"]
+    )
+
+
+def test_public_can_sort_products_by_price_ascending(
+    client, db_session, product_category
+):
+    products = []
+
+    for name, prices in [
+        ("Expensive Food", [1299.00, 2499.00]),
+        ("Affordable Food", [499.00, 999.00]),
+        ("Medium Food", [799.00, 1499.00]),
+    ]:
+        product = Product(
+            category_id=product_category.id,
+            name=name,
+            slug=f"{name.lower().replace(' ', '-')}-{uuid.uuid4().hex[:8]}",
+            status=ProductStatus.ACTIVE,
+        )
+        db_session.add(product)
+        db_session.flush()
+
+        for index, price in enumerate(prices):
+            db_session.add(
+                ProductVariant(
+                    product_id=product.id,
+                    sku=f"PRICE-{uuid.uuid4().hex[:8]}",
+                    variant_name=f"Pack {index + 1}",
+                    weight_grams=(index + 1) * 1000,
+                    price=price,
+                    currency="INR",
+                    is_active=True,
+                )
+            )
+
+        products.append((product, min(prices)))
+
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/products/?sort_by=price&sort_order=asc"
+    )
+
+    assert response.status_code == 200
+    results = response.json()
+
+    result_ids = [
+        item["id"]
+        for item in results
+        if item["id"] in {str(product.id) for product, _ in products}
+    ]
+
+    expected_ids = [
+        str(product.id)
+        for product, _ in sorted(products, key=lambda entry: entry[1])
+    ]
+
+    assert result_ids == expected_ids
+
+
+def test_public_can_sort_products_by_price_descending(
+    client, db_session, product_category
+):
+    products = []
+
+    for name, price in [
+        ("Low Price Food", 499.00),
+        ("High Price Food", 2499.00),
+        ("Middle Price Food", 1299.00),
+    ]:
+        product = Product(
+            category_id=product_category.id,
+            name=name,
+            slug=f"{name.lower().replace(' ', '-')}-{uuid.uuid4().hex[:8]}",
+            status=ProductStatus.ACTIVE,
+        )
+        db_session.add(product)
+        db_session.flush()
+
+        db_session.add(
+            ProductVariant(
+                product_id=product.id,
+                sku=f"PRICE-{uuid.uuid4().hex[:8]}",
+                variant_name="1 kg",
+                weight_grams=1000,
+                price=price,
+                currency="INR",
+                is_active=True,
+            )
+        )
+        products.append((product, price))
+
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/products/?sort_by=price&sort_order=desc"
+    )
+
+    assert response.status_code == 200
+    results = response.json()
+
+    result_ids = [
+        item["id"]
+        for item in results
+        if item["id"] in {str(product.id) for product, _ in products}
+    ]
+
+    expected_ids = [
+        str(product.id)
+        for product, _ in sorted(
+            products, key=lambda entry: entry[1], reverse=True
+        )
+    ]
+
+    assert result_ids == expected_ids
