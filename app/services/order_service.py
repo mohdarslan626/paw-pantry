@@ -8,6 +8,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert
 
 from app.models.models import (
     CartItem,
@@ -67,15 +68,31 @@ def checkout_service(
                 )
                 if existing_order is not None:
                     return _order_response(db, existing_order)
-
+                  
         else:
-            key_record = IdempotencyKey(
-                scope=scope,
-                key=request.idempotency_key,
-                request_hash=request_hash,
+            statement = (
+                insert(IdempotencyKey)
+                .values(
+                    scope=scope,
+                    key=request.idempotency_key,
+                    request_hash=request_hash,
+                )
+                .on_conflict_do_nothing(
+                    index_elements=["scope", "key"]
+                )
+                .returning(IdempotencyKey.id)
             )
-            db.add(key_record)
-            db.flush()
+
+            inserted_id = db.scalar(statement)
+
+            if inserted_id is None:
+                # Another request created this key first.
+                db.rollback()
+                raise ValueError(
+                    "Checkout request is already being processed. Please retry."
+                )
+
+            key_record = db.get(IdempotencyKey, inserted_id)
 
         address = get_shipping_address(
             db, user_id, request.shipping_address_id
