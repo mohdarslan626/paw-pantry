@@ -1,0 +1,22 @@
+
+services:
+  db:
+    image: postgres:17
+    container_name: paw-pantry-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paw_pantry
+      POSTGRES_USER: paw_pantry_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - paw_pantry_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paw_pantry_user -d paw_pantry"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  paw_pantry_data:
