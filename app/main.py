@@ -2,7 +2,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
+from fastapi.middleware.cors import CORSMiddleware
 from app.db.session import get_db
 from app.api.v1.categories import router as categories_router
 from app.api.v1.brands import router as brands_router
@@ -11,11 +11,25 @@ from app.api.v1.products import router as products_router
 from app.api.v1.product_variants import router as product_variants_router
 from app.api.v1.cart import router as cart_router
 from app.api.v1.orders import router as orders_router
+from app.api.v1.addresses import router as addresses_router
 
 app = FastAPI(
     title="Paw Pantry API",
     description="Backend API for the Paw Pantry dog-food store.",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(
@@ -50,6 +64,11 @@ app.include_router(
 
 app.include_router(
     orders_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    addresses_router,
     prefix="/api/v1",
 )
 

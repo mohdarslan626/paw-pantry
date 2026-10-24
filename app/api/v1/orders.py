@@ -3,12 +3,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import select
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
-from app.models.models import User
-from app.schemas.order import CheckoutRequest, CheckoutResponse
+from app.models.models import User, Order
+from app.schemas.order import (CheckoutRequest, CheckoutResponse, OrderHistoryResponse)
 from app.services.order_service import checkout_service
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
@@ -50,3 +50,21 @@ def checkout(
             status_code=status.HTTP_409_CONFLICT,
             detail="Checkout conflicted with another request. Please retry.",
         ) from exc
+
+
+@router.get("/", response_model=list[OrderHistoryResponse])
+def list_my_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    statement = (
+        select(Order)
+        .where(
+            Order.user_id == current_user.id,
+            Order.deleted_at.is_(None),
+        )
+        .options(selectinload(Order.items))
+        .order_by(Order.created_at.desc())
+    )
+
+    return db.scalars(statement).all()
