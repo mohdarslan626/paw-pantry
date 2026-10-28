@@ -97,3 +97,15 @@ class OrderDetailResponse(OrderHistoryResponse):
     billing_address_snapshot: dict | None = None
     shipments: list[ShipmentTrackingResponse] = Field(default_factory=list)
     status_history: list[OrderStatusHistoryResponse] = Field(default_factory=list)
+
+class ShipmentCreateRequest(BaseModel):
+    """Shipment details supplied by an administrator."""
+
+    carrier: str = Field(min_length=1, max_length=100)
+    tracking_number: str = Field(min_length=1, max_length=160)
+
+
+class ShipmentStatusUpdateRequest(BaseModel):
+    """Only forward shipment transitions are accepted by the API."""
+
+    status: str = Field(pattern=r"^(in_transit|delivered)$")
