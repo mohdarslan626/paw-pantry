@@ -69,3 +69,31 @@ class OrderHistoryResponse(BaseModel):
     created_at: datetime
     items: list[OrderHistoryItemResponse]
 
+
+
+class ShipmentTrackingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    carrier: str | None
+    tracking_number: str | None
+    status: str
+    shipped_at: datetime | None
+    delivered_at: datetime | None
+    created_at: datetime
+
+
+class OrderStatusHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    old_status: str | None
+    new_status: str
+    reason: str | None
+    created_at: datetime
+
+
+class OrderDetailResponse(OrderHistoryResponse):
+    billing_address_snapshot: dict | None = None
+    shipments: list[ShipmentTrackingResponse] = Field(default_factory=list)
+    status_history: list[OrderStatusHistoryResponse] = Field(default_factory=list)

@@ -130,6 +130,30 @@ type OrderHistory = {
   items: OrderHistoryItem[];
 };
 
+type OrderShipment = {
+  id: string;
+  carrier: string | null;
+  tracking_number: string | null;
+  status: string;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  created_at: string;
+};
+
+type OrderStatusEvent = {
+  id: string;
+  old_status: string | null;
+  new_status: string;
+  reason: string | null;
+  created_at: string;
+};
+
+type OrderDetail = OrderHistory & {
+  billing_address_snapshot: Record<string, unknown> | null;
+  shipments: OrderShipment[];
+  status_history: OrderStatusEvent[];
+};
+
 const checkoutInputStyle: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
@@ -196,6 +220,9 @@ function App() {
   const [orders, setOrders] = useState<OrderHistory[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
+  const [orderDetail, setOrderDetail] = useState<OrderDetail | null>(null);
+  const [orderDetailLoading, setOrderDetailLoading] = useState(false);
+  const [orderDetailError, setOrderDetailError] = useState("");
   const [addresses, setAddresses] = useState<ShippingAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [addressFormOpen, setAddressFormOpen] = useState(false);
@@ -470,6 +497,8 @@ function App() {
     }
 
     setOrdersOpen(true);
+    setOrderDetail(null);
+    setOrderDetailError("");
     setOrdersLoading(true);
     setOrdersError("");
     try {
@@ -490,6 +519,30 @@ function App() {
       setOrdersError(error instanceof Error ? error.message : "Unable to load your orders.");
     } finally {
       setOrdersLoading(false);
+    }
+  }
+
+  async function loadOrderDetail(orderId: string) {
+    setOrderDetailLoading(true);
+    setOrderDetailError("");
+    setOrderDetail(null);
+    try {
+      const token = localStorage.getItem("paw_pantry_access_token");
+      const response = await fetch(`http://127.0.0.1:8000/api/v1/orders/${orderId}`, {
+        headers: {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.detail ?? `Unable to load order details (${response.status}).`);
+      }
+      setOrderDetail(await response.json() as OrderDetail);
+    } catch (error) {
+      setOrderDetailError(error instanceof Error ? error.message : "Unable to load order details.");
+    } finally {
+      setOrderDetailLoading(false);
     }
   }
 
@@ -692,6 +745,52 @@ function App() {
                       <span style={{ color: "#687568", fontSize: 13 }}>{order.items.length} item type{order.items.length === 1 ? "" : "s"}</span>
                       <span style={{ fontSize: 17, fontWeight: 800, color: "#234c3a" }}>Total: {formatMoney(order.total_amount, order.currency)}</span>
                     </div>
+                    <div style={{ marginTop: 14 }}>
+                      <button className="button button-outline" type="button" onClick={() => void loadOrderDetail(order.id)}>
+                        View details &amp; tracking
+                      </button>
+                    </div>
+                    {orderDetail?.id === order.id && (
+                      <section aria-label={`Tracking for order ${order.order_number}`} style={{ marginTop: 16, padding: 16, borderRadius: 12, background: "#f3f6ee", border: "1px solid #dce5d5" }}>
+                        <h3 style={{ margin: "0 0 12px", color: "#234c3a" }}>Order details &amp; tracking</h3>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
+                          <div><span style={{ color: "#687568", fontSize: 12 }}>Subtotal</span><div><strong>{formatMoney(orderDetail.subtotal_amount, orderDetail.currency)}</strong></div></div>
+                          <div><span style={{ color: "#687568", fontSize: 12 }}>Shipping</span><div><strong>{formatMoney(orderDetail.shipping_amount, orderDetail.currency)}</strong></div></div>
+                          <div><span style={{ color: "#687568", fontSize: 12 }}>Tax</span><div><strong>{formatMoney(orderDetail.tax_amount, orderDetail.currency)}</strong></div></div>
+                          <div><span style={{ color: "#687568", fontSize: 12 }}>Discount</span><div><strong>{formatMoney(orderDetail.discount_amount, orderDetail.currency)}</strong></div></div>
+                        </div>
+                        <h4 style={{ margin: "12px 0 8px", color: "#234c3a" }}>Shipping address</h4>
+                        <p style={{ margin: 0, color: "#3c4b3e" }}>{Object.values(orderDetail.shipping_address_snapshot).filter((value) => typeof value === "string" || typeof value === "number").join(", ") || "Address snapshot unavailable"}</p>
+                        <h4 style={{ margin: "16px 0 8px", color: "#234c3a" }}>Shipment</h4>
+                        {orderDetail.shipments.length === 0 ? (
+                          <p style={{ margin: 0, color: "#687568" }}>Shipment tracking will appear here once your order is dispatched.</p>
+                        ) : orderDetail.shipments.map((shipment) => (
+                          <div key={shipment.id} style={{ marginBottom: 10, padding: 12, background: "#fffdf9", borderRadius: 10 }}>
+                            <p style={{ margin: 0 }}><strong>Status:</strong> <span style={{ textTransform: "capitalize" }}>{shipment.status.replaceAll("_", " ")}</span></p>
+                            {shipment.carrier && <p style={{ margin: "5px 0 0" }}><strong>Carrier:</strong> {shipment.carrier}</p>}
+                            {shipment.tracking_number && <p style={{ margin: "5px 0 0" }}><strong>Tracking number:</strong> {shipment.tracking_number}</p>}
+                            {shipment.shipped_at && <p style={{ margin: "5px 0 0" }}><strong>Shipped:</strong> {formatOrderDate(shipment.shipped_at)}</p>}
+                            {shipment.delivered_at && <p style={{ margin: "5px 0 0" }}><strong>Delivered:</strong> {formatOrderDate(shipment.delivered_at)}</p>}
+                          </div>
+                        ))}
+                        <h4 style={{ margin: "16px 0 8px", color: "#234c3a" }}>Status timeline</h4>
+                        {orderDetail.status_history.length === 0 ? (
+                          <p style={{ margin: 0, color: "#687568" }}>No status updates have been recorded yet.</p>
+                        ) : (
+                          <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 10 }}>
+                            {orderDetail.status_history.map((event) => (
+                              <li key={event.id}>
+                                <strong style={{ textTransform: "capitalize" }}>{event.new_status.replaceAll("_", " ")}</strong>
+                                <div style={{ fontSize: 12, color: "#687568" }}>{new Date(event.created_at).toLocaleString("en-IN")}</div>
+                                {event.reason && <div style={{ color: "#3c4b3e" }}>{event.reason}</div>}
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </section>
+                    )}
+                    {orderDetailLoading && <p role="status" style={{ marginTop: 12 }}>Loading order details…</p>}
+                    {orderDetailError && <p role="alert" style={{ marginTop: 12, color: "#923c2c" }}>{orderDetailError}</p>}
                   </article>
                 ))}
               </div>
