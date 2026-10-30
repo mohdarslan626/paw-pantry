@@ -1,4 +1,5 @@
 ﻿
+import { API_BASE_URL } from "./api";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -249,7 +250,7 @@ function App() {
       try {
         setProductsLoading(true);
         setProductsError("");
-        const response = await fetch("http://127.0.0.1:8000/api/v1/products/", {
+        const response = await fetch(`${API_BASE_URL}/products/`, {
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -503,7 +504,7 @@ function App() {
     setOrdersError("");
     try {
       const token = localStorage.getItem("paw_pantry_access_token");
-      const response = await fetch("http://127.0.0.1:8000/api/v1/orders/", {
+      const response = await fetch(`${API_BASE_URL}/orders/`, {
         headers: {
           Accept: "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -528,7 +529,7 @@ function App() {
     setOrderDetail(null);
     try {
       const token = localStorage.getItem("paw_pantry_access_token");
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/orders/${orderId}`, {
+      const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
         headers: {
           Accept: "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),

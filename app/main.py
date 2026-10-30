@@ -1,5 +1,5 @@
 
-import logging
+import logging, os
 
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.staticfiles import StaticFiles
 from app.core.config import get_settings
 from app.core.logging_config import configure_logging
 from app.db.session import get_db
@@ -19,6 +19,7 @@ from app.api.v1.product_variants import router as product_variants_router
 from app.api.v1.cart import router as cart_router
 from app.api.v1.orders import router as orders_router
 from app.api.v1.addresses import router as addresses_router
+from app.api.v1.media import router as media_router
 
 configure_logging()
 logger = logging.getLogger("app")
@@ -97,6 +98,20 @@ app.include_router(
 app.include_router(
     addresses_router,
     prefix="/api/v1",
+)
+
+app.include_router(
+    media_router,
+    prefix="/api/v1",
+)
+
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+app.mount(
+    "/media",
+    StaticFiles(directory=UPLOAD_DIR),
+    name="media",
 )
 
 @app.get("/health", tags=["Health"])
