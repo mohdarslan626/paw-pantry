@@ -95,3 +95,53 @@ def test_user_gets_404_for_soft_deleted_order(client, db_session, user_headers):
     response = client.get(f"/api/v1/orders/{order.id}", headers=user_headers)
 
     assert response.status_code == 404
+
+
+def test_order_detail_excludes_soft_deleted_shipments(
+    client, db_session, user_headers
+):
+    from datetime import datetime, timezone
+
+    user = (
+        db_session.query(User)
+        .filter_by(email="regular-test@example.com")
+        .one()
+    )
+    order = make_order(db_session, user.id)
+
+    active_shipment = Shipment(
+        id=uuid.uuid4(),
+        order_id=order.id,
+        carrier="Test Courier",
+        tracking_number="ACTIVE-TRACK",
+        status="in_transit",
+    )
+
+    deleted_shipment = Shipment(
+        id=uuid.uuid4(),
+        order_id=order.id,
+        carrier="Deleted Courier",
+        tracking_number="DELETED-TRACK",
+        status="pending",
+        deleted_at=datetime.now(timezone.utc),
+    )
+
+    db_session.add_all([active_shipment, deleted_shipment])
+    db_session.commit()
+
+    response = client.get(
+        f"/api/v1/orders/{order.id}",
+        headers=user_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    tracking_numbers = [
+        shipment["tracking_number"]
+        for shipment in body["shipments"]
+    ]
+
+    assert "ACTIVE-TRACK" in tracking_numbers
+    assert "DELETED-TRACK" not in tracking_numbers
+    assert len(tracking_numbers) == 1

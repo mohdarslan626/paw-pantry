@@ -1,6 +1,6 @@
 import uuid
 from decimal import Decimal
-
+from datetime import datetime, timedelta, timezone
 from fastapi import status
 
 from app.models.models import Order, OrderStatus, OrderStatusHistory, Shipment, User, UserStatus
@@ -181,3 +181,141 @@ def test_repeating_current_shipment_status_is_idempotent(
         .count()
         == 0
     )
+
+
+def test_delivery_creates_exactly_one_delivered_history_event(
+    client, db_session, admin_headers, user_headers
+):
+    order = _make_shippable_order(db_session)
+    shipment = Shipment(
+        id=uuid.uuid4(),
+        order_id=order.id,
+        carrier="Test Courier",
+        tracking_number="TRACK-DELIVERY-ONCE",
+        status="in_transit",
+    )
+    db_session.add(shipment)
+    db_session.flush()
+
+    url = f"/api/v1/orders/{order.id}/shipments/{shipment.id}/status"
+
+    first = client.patch(
+        url,
+        headers=admin_headers,
+        json={"status": "delivered"},
+    )
+    assert first.status_code == status.HTTP_200_OK, first.text
+
+    db_session.refresh(order)
+    assert order.status == OrderStatus.DELIVERED
+
+    delivered_events = (
+        db_session.query(OrderStatusHistory)
+        .filter_by(order_id=order.id, new_status="delivered")
+        .all()
+    )
+    assert len(delivered_events) == 1
+
+    # Repeating the same delivery request must not duplicate history.
+    second = client.patch(
+        url,
+        headers=admin_headers,
+        json={"status": "delivered"},
+    )
+    assert second.status_code == status.HTTP_200_OK, second.text
+
+    delivered_events = (
+        db_session.query(OrderStatusHistory)
+        .filter_by(order_id=order.id, new_status="delivered")
+        .all()
+    )
+    assert len(delivered_events) == 1
+
+
+def test_soft_deleted_pending_shipment_does_not_block_delivery(
+    client, db_session, admin_headers, user_headers
+):
+    order = _make_shippable_order(db_session)
+
+    active_shipment = Shipment(
+        id=uuid.uuid4(),
+        order_id=order.id,
+        carrier="Test Courier",
+        tracking_number="TRACK-ACTIVE-DELIVERY",
+        status="in_transit",
+    )
+    deleted_shipment = Shipment(
+        id=uuid.uuid4(),
+        order_id=order.id,
+        carrier="Old Test Courier",
+        tracking_number="TRACK-DELETED-PENDING",
+        status="pending",
+        deleted_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([active_shipment, deleted_shipment])
+    db_session.flush()
+
+    response = client.patch(
+        (
+            f"/api/v1/orders/{order.id}/shipments/"
+            f"{active_shipment.id}/status"
+        ),
+        headers=admin_headers,
+        json={"status": "delivered"},
+    )
+    assert response.status_code == status.HTTP_200_OK, response.text
+
+    db_session.refresh(order)
+    assert order.status == OrderStatus.DELIVERED
+
+    db_session.refresh(deleted_shipment)
+    assert deleted_shipment.status == "pending"
+    assert deleted_shipment.deleted_at is not None
+
+    delivered_events = (
+        db_session.query(OrderStatusHistory)
+        .filter_by(order_id=order.id, new_status="delivered")
+        .all()
+    )
+    assert len(delivered_events) == 1
+
+
+def test_order_detail_excludes_soft_deleted_shipments(
+    client, db_session, admin_headers, user_headers
+):
+    order = _make_shippable_order(db_session)
+
+    active_shipment = Shipment(
+        id=uuid.uuid4(),
+        order_id=order.id,
+        carrier="Active Courier",
+        tracking_number="TRACK-API-ACTIVE",
+        status="pending",
+    )
+    deleted_shipment = Shipment(
+        id=uuid.uuid4(),
+        order_id=order.id,
+        carrier="Deleted Courier",
+        tracking_number="TRACK-API-DELETED",
+        status="pending",
+        deleted_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([active_shipment, deleted_shipment])
+    db_session.flush()
+
+    response = client.get(
+        f"/api/v1/orders/{order.id}",
+        headers=user_headers,
+    )
+    assert response.status_code == status.HTTP_200_OK, response.text
+
+    body = response.json()
+    shipments = body["shipments"]
+
+    shipment_ids = {item["id"] for item in shipments}
+    tracking_numbers = {item["tracking_number"] for item in shipments}
+
+    assert str(active_shipment.id) in shipment_ids
+    assert str(deleted_shipment.id) not in shipment_ids
+    assert "TRACK-API-ACTIVE" in tracking_numbers
+    assert "TRACK-API-DELETED" not in tracking_numbers

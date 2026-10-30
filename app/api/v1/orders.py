@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, with_loader_criteria
 
 from app.core.dependencies import get_current_user, require_admin
 from app.db.session import get_db
@@ -102,6 +102,10 @@ def get_my_order(
             selectinload(Order.items),
             selectinload(Order.shipments),
             selectinload(Order.status_history),
+            with_loader_criteria(
+                Shipment,
+                Shipment.deleted_at.is_(None),
+            ),
         )
     )
     order = db.scalars(statement).first()
@@ -141,6 +145,21 @@ def create_shipment(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Cannot create a shipment for an order with status '{order.status.value}'.",
         )
+    
+    """Create a check for an order already having a shipment with the same tracking number and carrier."""
+    existing_shipment = db.scalars(
+    select(Shipment).where(
+        Shipment.order_id == order.id,
+        Shipment.tracking_number == request.tracking_number,
+        Shipment.deleted_at.is_(None),
+    )
+    ).first()
+
+    if existing_shipment is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A shipment with this tracking number already exists for this order.",
+        )
 
     shipment = Shipment(
         order_id=order.id,
@@ -160,11 +179,48 @@ def create_shipment(
         ) from exc
     return shipment
 
+def reconcile_order_delivery_status(db: Session, order: Order) -> bool:
+    """Mark an order delivered when all its active shipments are delivered."""
+    if order.status in (OrderStatus.CANCELLED, OrderStatus.REFUNDED):
+        return False
+
+    db.flush()
+
+    active_shipments = db.scalars(
+        select(Shipment).where(
+            Shipment.order_id == order.id,
+            Shipment.deleted_at.is_(None),
+        )
+    ).all()
+
+    # Do not treat an order with zero active shipments as delivered.
+    if not active_shipments:
+        return False
+
+    if not all(shipment.status == "delivered" for shipment in active_shipments):
+        return False
+
+    if order.status == OrderStatus.DELIVERED:
+        return False
+
+    old_status = order.status
+    order.status = OrderStatus.DELIVERED
+
+    db.add(
+        OrderStatusHistory(
+            order_id=order.id,
+            old_status=old_status.value,
+            new_status=OrderStatus.DELIVERED.value,
+            reason="All active shipments for the order have been delivered.",
+        )
+    )
+    return True
 
 @router.patch(
     "/{order_id}/shipments/{shipment_id}/status",
     response_model=ShipmentTrackingResponse,
 )
+
 def update_shipment_status(
     order_id: UUID,
     shipment_id: UUID,
@@ -183,7 +239,11 @@ def update_shipment_status(
 
     shipment = db.scalars(
         select(Shipment)
-        .where(Shipment.id == shipment_id, Shipment.order_id == order_id)
+        .where(
+            Shipment.id == shipment_id, 
+            Shipment.order_id == order_id, 
+            Shipment.deleted_at.is_(None),
+        )
         .with_for_update()
     ).first()
     if shipment is None:
@@ -195,6 +255,19 @@ def update_shipment_status(
 
     # A repeated request is safe to retry and does not create duplicate history.
     if target == current:
+        if (
+            target == "delivered"
+            and reconcile_order_delivery_status(db, order)
+        ):
+            try:
+                db.commit()
+                db.refresh(shipment)
+            except IntegrityError as exc:
+                db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Shipment status update conflicted with another request.",
+                ) from exc
         return shipment
 
     if target not in allowed.get(current, set()):
@@ -232,25 +305,7 @@ def update_shipment_status(
             )
     elif target == "delivered":
         shipment.delivered_at = now
-        # An order with multiple shipments is delivered only after all shipments
-        # have reached delivered status.
-        db.flush()
-        all_shipments = db.scalars(
-            select(Shipment).where(Shipment.order_id == order.id, Shipment.deleted_at.is_(None))
-        ).all()
-        if all(ship.status == "delivered" for ship in all_shipments):
-            if order.status != OrderStatus.DELIVERED:
-                old_status = order.status
-                order.status = OrderStatus.DELIVERED
-                db.add(
-                    OrderStatusHistory(
-                        order_id=order.id,
-                        old_status=old_status.value,
-                        new_status=OrderStatus.DELIVERED.value,
-                        reason="All shipments for the order have been delivered.",
-                    )
-                )
-
+        reconcile_order_delivery_status(db, order)
     try:
         db.commit()
         db.refresh(shipment)

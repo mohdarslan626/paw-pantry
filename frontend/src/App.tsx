@@ -1,4 +1,4 @@
-
+﻿
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -165,11 +165,11 @@ const checkoutInputStyle: React.CSSProperties = {
 };
 
 const categories = [
-  { name: "Dry Food", icon: "🥣", color: "#f3dfc6" },
-  { name: "Wet Food", icon: "🥩", color: "#f4dfce" },
-  { name: "Treats", icon: "🦴", color: "#f3e4d0" },
-  { name: "Supplements", icon: "🌿", color: "#e2e9d7" },
-  { name: "Accessories", icon: "🎾", color: "#f6e5d1" },
+  { name: "Dry Food", icon: "ðŸ¥£", color: "#f3dfc6" },
+  { name: "Wet Food", icon: "ðŸ¥©", color: "#f4dfce" },
+  { name: "Treats", icon: "ðŸ¦´", color: "#f3e4d0" },
+  { name: "Supplements", icon: "ðŸŒ¿", color: "#e2e9d7" },
+  { name: "Accessories", icon: "ðŸŽ¾", color: "#f6e5d1" },
 ];
 
 function ProductPack({ product }: { product: Product }) {
@@ -190,8 +190,8 @@ function ProductPack({ product }: { product: Product }) {
         <span>paw pantry</span>
       </div>
       <div className="pack-name">{product.name}</div>
-      <div className="pack-dog">🐕</div>
-      <div className="pack-food">✦ ✦ ✦</div>
+      <div className="pack-dog">ðŸ•</div>
+      <div className="pack-food">âœ¦ âœ¦ âœ¦</div>
       <div className="pack-weight">{product.size}</div>
     </div>
   );
@@ -554,7 +554,7 @@ function App() {
   }
 
   function formatMoney(value: string | number, currency: string) {
-    return `${currency === "INR" ? "₹" : currency + " "}${Number(value).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+    return `${currency === "INR" ? "â‚¹" : currency + " "}${Number(value).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
   }
 
   function toggleWishlist(id: string) {
@@ -568,11 +568,11 @@ function App() {
   return (
     <div className="site-shell">
       <div className="announcement-bar">
-        <span><Truck size={14} /> Free shipping on orders over ₹999</span>
+        <span><Truck size={14} /> Free shipping on orders over â‚¹999</span>
         <span className="announcement-center">
           <Leaf size={14} /> Fresh food. Happier tails.
         </span>
-        <span>Made for your best friend <span className="tiny-heart">♥</span></span>
+        <span>Made for your best friend <span className="tiny-heart">â™¥</span></span>
       </div>
 
       <header className="site-header">
@@ -717,7 +717,7 @@ function App() {
               </div>
             ) : orders.length === 0 ? (
               <div style={{ padding: "42px 12px", textAlign: "center" }}>
-                <span style={{ fontSize: 42 }}>🐾</span>
+                <span style={{ fontSize: 42 }}>ðŸ¾</span>
                 <h3>No orders yet</h3>
                 <p style={{ color: "#687568" }}>Your next favourite for your pup is just around the corner.</p>
                 <button className="button button-dark" onClick={() => { setOrdersOpen(false); document.getElementById("shop")?.scrollIntoView({ behavior: "smooth" }); }}>Explore products</button>
@@ -736,7 +736,7 @@ function App() {
                     <div style={{ display: "grid", gap: 10, margin: "16px 0" }}>
                       {order.items.map((item) => (
                         <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "#3c4b3e" }}>
-                          <span>{item.name_snapshot} <span style={{ color: "#687568" }}>× {item.quantity}</span></span>
+                          <span>{item.name_snapshot} <span style={{ color: "#687568" }}>Ã— {item.quantity}</span></span>
                           <strong style={{ whiteSpace: "nowrap" }}>{formatMoney(Number(item.unit_price) * item.quantity, order.currency)}</strong>
                         </div>
                       ))}
@@ -789,7 +789,7 @@ function App() {
                         )}
                       </section>
                     )}
-                    {orderDetailLoading && <p role="status" style={{ marginTop: 12 }}>Loading order details…</p>}
+                    {orderDetailLoading && <p role="status" style={{ marginTop: 12 }}>Loading order detailsâ€¦</p>}
                     {orderDetailError && <p role="alert" style={{ marginTop: 12, color: "#923c2c" }}>{orderDetailError}</p>}
                   </article>
                 ))}
@@ -833,10 +833,10 @@ function App() {
                     <article key={item.id} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, paddingBottom: 16, borderBottom: "1px solid #e4e8df" }}>
                       <div>
                         <strong>{item.product_name}</strong>
-                        <p style={{ margin: "5px 0", color: "#687568" }}>{item.variant_name}{item.weight_grams ? ` · ${item.weight_grams} g` : ""}</p>
+                        <p style={{ margin: "5px 0", color: "#687568" }}>{item.variant_name}{item.weight_grams ? ` Â· ${item.weight_grams} g` : ""}</p>
                         <strong>{item.currency} {Number(item.unit_price).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</strong>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
-                          <button className="icon-button" aria-label={`Decrease ${item.product_name} quantity`} disabled={cartLoading || item.quantity <= 1} onClick={() => void changeCartQuantity(item.id, item.quantity - 1)}>−</button>
+                          <button className="icon-button" aria-label={`Decrease ${item.product_name} quantity`} disabled={cartLoading || item.quantity <= 1} onClick={() => void changeCartQuantity(item.id, item.quantity - 1)}>âˆ’</button>
                           <span aria-label="Quantity">{item.quantity}</span>
                           <button className="icon-button" aria-label={`Increase ${item.product_name} quantity`} disabled={cartLoading || item.quantity >= 100} onClick={() => void changeCartQuantity(item.id, item.quantity + 1)}>+</button>
                           <button type="button" onClick={() => void deleteCartItem(item.id)} disabled={cartLoading} style={{ border: 0, background: "transparent", color: "#a34b36", textDecoration: "underline", cursor: "pointer", marginLeft: 4 }}>Remove</button>
@@ -868,7 +868,7 @@ function App() {
           <section role="dialog" aria-modal="true" aria-labelledby="checkout-title" style={{ width: "min(100%, 920px)", margin: "24px auto", background: "#fffaf3", borderRadius: 24, padding: "clamp(20px, 4vw, 36px)", boxSizing: "border-box", boxShadow: "0 24px 80px rgba(0,0,0,.22)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, borderBottom: "1px solid #e4e8df", paddingBottom: 20 }}>
               <div>
-                <span className="eyebrow">PAW PANTRY · SECURE CHECKOUT</span>
+                <span className="eyebrow">PAW PANTRY Â· SECURE CHECKOUT</span>
                 <h2 id="checkout-title" style={{ margin: "8px 0 4px", color: "#234c3a" }}>{completedOrder ? "Order confirmed!" : "Almost home for your pup."}</h2>
                 <p style={{ margin: 0, color: "#687568" }}>{completedOrder ? "Thank you for choosing Paw Pantry." : "Confirm your delivery address and review your order."}</p>
               </div>
@@ -902,7 +902,7 @@ function App() {
                               <input type="radio" name="shipping-address" value={address.id} checked={selectedAddressId === address.id} onChange={() => setSelectedAddressId(address.id)} style={{ marginTop: 4 }} />
                               <span>
                                 <strong>{address.recipient_name}</strong>{address.is_default && <span style={{ marginLeft: 8, color: "#285c45", fontSize: 12 }}>DEFAULT</span>}
-                                <span style={{ display: "block", marginTop: 5, color: "#687568", lineHeight: 1.5 }}>{address.line1}{address.line2 ? `, ${address.line2}` : ""}<br />{address.city}, {address.state_region} {address.postal_code}<br />{address.country_code}{address.phone ? ` · ${address.phone}` : ""}</span>
+                                <span style={{ display: "block", marginTop: 5, color: "#687568", lineHeight: 1.5 }}>{address.line1}{address.line2 ? `, ${address.line2}` : ""}<br />{address.city}, {address.state_region} {address.postal_code}<br />{address.country_code}{address.phone ? ` Â· ${address.phone}` : ""}</span>
                               </span>
                             </label>
                           ))}
@@ -957,18 +957,18 @@ function App() {
                     <div style={{ display: "grid", gap: 14 }}>
                       {cart?.items.map((item) => (
                         <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                          <span><strong>{item.product_name}</strong><span style={{ display: "block", fontSize: 13, color: "#687568" }}>{item.variant_name} · Qty {item.quantity}</span></span>
+                          <span><strong>{item.product_name}</strong><span style={{ display: "block", fontSize: 13, color: "#687568" }}>{item.variant_name} Â· Qty {item.quantity}</span></span>
                           <strong style={{ whiteSpace: "nowrap" }}>{item.currency} {(Number(item.unit_price) * item.quantity).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</strong>
                         </div>
                       ))}
                     </div>
                     <div style={{ borderTop: "1px solid #e4e8df", marginTop: 18, paddingTop: 16, display: "grid", gap: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}><span>Subtotal</span><span>{cart?.currency ?? "INR"} {Number(cart?.subtotal ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span></div>
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "#687568" }}><span>Shipping</span><span>₹0.00</span></div>
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "#687568" }}><span>Tax</span><span>₹0.00</span></div>
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "#687568" }}><span>Shipping</span><span>â‚¹0.00</span></div>
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "#687568" }}><span>Tax</span><span>â‚¹0.00</span></div>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 800, borderTop: "1px solid #e4e8df", paddingTop: 12 }}><span>Total</span><span>{cart?.currency ?? "INR"} {Number(cart?.subtotal ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span></div>
                     </div>
-                    <p style={{ color: "#687568", fontSize: 12, lineHeight: 1.5 }}>Shipping and tax are currently set to ₹0 by the checkout backend.</p>
+                    <p style={{ color: "#687568", fontSize: 12, lineHeight: 1.5 }}>Shipping and tax are currently set to â‚¹0 by the checkout backend.</p>
                     <button className="button button-dark" style={{ width: "100%", marginTop: 12 }} onClick={() => void placeOrder()} disabled={checkoutLoading || addressSaving || addresses.length === 0 || !selectedAddressId}>
                       {checkoutLoading ? "Placing order..." : "Place order"} <ArrowRight size={16} />
                     </button>
@@ -1017,7 +1017,7 @@ function App() {
             <div className="hero-note">
               Good Food,
               <br />
-              Brighter Days <span>♡</span>
+              Brighter Days <span>â™¡</span>
             </div>
             <div className="hero-sticker">
               <PawPrint size={18} />
@@ -1092,14 +1092,14 @@ function App() {
           <div className="product-grid">
             {productsLoading && (
               <div className="empty-state" role="status">
-                <span>🐾</span>
+                <span>ðŸ¾</span>
                 <h3>Finding their favourites...</h3>
                 <p>Loading fresh picks from Paw Pantry.</p>
               </div>
             )}
             {!productsLoading && productsError && (
               <div className="empty-state" role="alert">
-                <span>🐾</span>
+                <span>ðŸ¾</span>
                 <h3>We couldn't load the products</h3>
                 <p>{productsError}. Make sure the Paw Pantry API is running.</p>
                 <button className="button button-dark" onClick={() => window.location.reload()}>
@@ -1128,7 +1128,7 @@ function App() {
                     <span className="rating-count">(120+ reviews)</span>
                   </div>
                   <div className="product-price-row">
-                    <strong>₹{product.price.toLocaleString("en-IN")}</strong>
+                    <strong>â‚¹{product.price.toLocaleString("en-IN")}</strong>
                     <span>{product.size}</span>
                   </div>
                   <button className="button button-dark add-button" disabled={cartLoading} onClick={() => void addToCart(product)}>
@@ -1139,7 +1139,7 @@ function App() {
             ))}
             {!productsLoading && !productsError && filteredProducts.length === 0 && (
               <div className="empty-state">
-                <span>🐾</span>
+                <span>ðŸ¾</span>
                 <h3>No matching products just yet</h3>
                 <p>Try another search or explore all our favourites.</p>
                 <button className="button button-dark" onClick={() => {
@@ -1152,7 +1152,7 @@ function App() {
         </section>
 
         <section className="story-banner">
-          <div className="story-illustration"><span>🌱</span><span>🐾</span></div>
+          <div className="story-illustration"><span>ðŸŒ±</span><span>ðŸ¾</span></div>
           <div>
             <span className="eyebrow">A LITTLE MORE LOVE IN EVERY MEAL</span>
             <h2>Because they're family, too.</h2>
@@ -1183,9 +1183,9 @@ function App() {
           <span className="brand-mark"><PawPrint size={27} /></span>
           <span className="brand-copy"><strong>paw pantry<span>.</span></strong><small>GOOD FOOD. HAPPY PAWS.</small></span>
         </a>
-        <p>Made with love for the ones who make life better. <span>♥</span></p>
+        <p>Made with love for the ones who make life better. <span>â™¥</span></p>
         <div className="footer-links"><a href="#shop">Shop</a><a href="#why-us">Our Story</a><a href="#footer">Contact</a><a href="#footer">Privacy</a></div>
-        <small className="copyright">© 2026 Paw Pantry. All paws reserved.</small>
+        <small className="copyright">Â© 2026 Paw Pantry. All paws reserved.</small>
       </footer>
 
       {notice && (
@@ -1200,3 +1200,4 @@ function App() {
 }
 
 export default App;
+
