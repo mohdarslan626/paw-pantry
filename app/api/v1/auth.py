@@ -9,7 +9,19 @@ from app.services.auth_service import register_user, login_user
 
 from app.core.dependencies import get_current_user
 from app.models.models import User
+import logging
 
+from app.schemas.auth import (
+    PasswordResetRequest,
+    PasswordResetConfirm,
+    PasswordResetResponse,
+)
+from app.services.password_reset_service import (
+    request_password_reset,
+    reset_password,
+)
+
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
@@ -58,3 +70,58 @@ def get_my_profile(
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
     return current_user
+
+
+@router.post(
+    "/forgot-password",
+    response_model=PasswordResetResponse,
+)
+def forgot_password(
+    request: PasswordResetRequest,
+    db: Session = Depends(get_db),
+) -> PasswordResetResponse:
+    try:
+        request_password_reset(db, str(request.email))
+    except Exception:
+        db.rollback()
+        logger.exception("Password reset request failed.")
+
+    return PasswordResetResponse(
+        message=(
+            "If an eligible account exists for that email, "
+            "a password reset link has been sent."
+        )
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=PasswordResetResponse,
+)
+def confirm_password_reset(
+    request: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+) -> PasswordResetResponse:
+    try:
+        success = reset_password(
+            db,
+            request.token,
+            request.new_password,
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("Password reset failed.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to reset password. Please try again.",
+        )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset link.",
+        )
+
+    return PasswordResetResponse(
+        message="Your password has been reset successfully."
+    )

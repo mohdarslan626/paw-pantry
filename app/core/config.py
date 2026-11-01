@@ -7,18 +7,31 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # Database
     database_url: str
 
+    # JWT Authentication
     jwt_secret_key: SecretStr
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    # Application
     environment: str = "development"
     cors_allowed_origins: Annotated[list[str], NoDecode] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
     seed_on_startup: bool = True
+
+    # Email / SMTP configuration
+    smtp_host: str = "mailpit"
+    smtp_port: int = 1025
+    smtp_use_tls: bool = False
+    smtp_from_email: str = "noreply@pawpantry.local"
+
+    # Password recovery
+    frontend_url: str = "http://localhost:5173"
+    password_reset_token_expire_minutes: int = 15
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -30,7 +43,11 @@ class Settings(BaseSettings):
     @classmethod
     def _split_cors_origins(cls, value: object) -> object:
         if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
+            return [
+                origin.strip()
+                for origin in value.split(",")
+                if origin.strip()
+            ]
         return value
 
 
