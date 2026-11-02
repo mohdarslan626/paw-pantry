@@ -23,6 +23,9 @@ import {
   getCart,
   loginUser,
   logoutUser,
+  requestPasswordReset,
+  resetPassword,
+  registerUser,
   updateCartItem,
   removeCartItem,
   getAddresses,
@@ -213,9 +216,37 @@ function App() {
   );
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [authView, setAuthView] = useState<
+  "login" | "register" | "forgot-password" | "reset-password"
+  >("login");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [registerName, setRegisterName] = useState("");
+  const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    const currentPath = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    if (currentPath === "/reset-password") {
+      setLoginOpen(true);
+      setAuthView("reset-password");
+
+      if (token) {
+        setResetToken(token);
+      } else {
+        setNotice("Password reset token is missing.");
+      }
+    }
+  }, []);
+
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [notice, setNotice] = useState("");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [orders, setOrders] = useState<OrderHistory[]>([]);
@@ -305,7 +336,7 @@ function App() {
   async function addToCart(product: Product) {
   if (!isLoggedIn) {
     setCartOpen(false);
-    setLoginOpen(true);
+    openLoginModal();
     setNotice("Please log in before adding items to your cart.");
     return;
   }
@@ -341,6 +372,112 @@ function App() {
       setNotice(error instanceof Error ? error.message : "Login failed.");
     } finally {
       setCartLoading(false);
+    }
+  }
+  
+  async function handleRegister(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (registerPassword !== registerConfirmPassword) {
+      setNotice("Passwords do not match.");
+      return;
+    }
+
+    try {
+      setCartLoading(true);
+
+      await registerUser({
+        email: registerEmail.trim(),
+        password: registerPassword,
+        display_name: registerName.trim(),
+      });
+
+      setLoginEmail(registerEmail.trim());
+      setLoginPassword("");
+
+      setRegisterName("");
+      setRegisterEmail("");
+      setRegisterPassword("");
+      setRegisterConfirmPassword("");
+
+      setAuthView("login");
+
+      setNotice("Account created successfully. Please log in.");
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Unable to create your account."
+      );
+    } finally {
+      setCartLoading(false);
+    }
+  }
+
+  async function handleForgotPassword(
+      event: React.FormEvent<HTMLFormElement>,
+    ) {
+      event.preventDefault();
+
+      const email = resetEmail.trim() || loginEmail.trim();
+
+      if (!email) {
+        setNotice("Please enter your email address.");
+        return;
+      }
+
+      try {
+        await requestPasswordReset(email);
+        setNotice("If an account exists, a password reset link has been sent.");
+      } catch (error) {
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : "Unable to request a password reset.",
+        );
+      }
+    }
+
+  async function handleResetPassword(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!resetToken) {
+      setNotice(
+        "Invalid or missing reset token. Please check your email for the reset link.",
+      );
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setNotice("Passwords do not match.");
+      return;
+    }
+
+    try {
+      await resetPassword(resetToken, newPassword);
+
+      // Clear reset-password URL and token
+      window.history.replaceState({}, document.title, "/");
+
+      setNotice(
+        "Your password has been reset successfully. You can now log in.",
+      );
+
+      setLoginPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setResetToken("");
+
+      // Return to normal login form
+      setAuthView("login");
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Unable to reset your password. Please try again.",
+      );
     }
   }
 
@@ -407,7 +544,7 @@ function App() {
   async function openCheckout() {
     if (!isLoggedIn) {
       setCartOpen(false);
-      setLoginOpen(true);
+      openLoginModal();
       setNotice("Please log in before checking out.");
       return;
     }
@@ -492,7 +629,7 @@ function App() {
 
   async function openMyOrders() {
     if (!isLoggedIn) {
-      setLoginOpen(true);
+      openLoginModal();
       setNotice("Please log in to view your orders.");
       return;
     }
@@ -565,7 +702,11 @@ function App() {
         : [...current, id],
     );
   }
-
+  function openLoginModal() {
+    setAuthView("login");
+    setNotice("");
+    setLoginOpen(true);
+  }
   return (
     <div className="site-shell">
       <div className="announcement-bar">
@@ -624,7 +765,7 @@ function App() {
               if (isLoggedIn) {
                 handleLogout();
               } else {
-                setLoginOpen(true);
+                openLoginModal();
               }
             }}
             style={{ padding: "10px 14px", whiteSpace: "nowrap", minHeight: 40 }}
@@ -665,33 +806,365 @@ function App() {
           onClick={(event) => {
             if (event.target === event.currentTarget) setLoginOpen(false);
           }}
-          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(22, 35, 27, 0.48)", display: "grid", placeItems: "center", padding: 20 }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(22, 35, 27, 0.48)",
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+          }}
         >
-          <section role="dialog" aria-modal="true" aria-labelledby="login-title" style={{ width: "min(100%, 420px)", background: "#fffaf3", borderRadius: 24, padding: 28, boxShadow: "0 24px 80px rgba(0,0,0,.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="login-title"
+            style={{
+              width: "min(100%, 420px)",
+              background: "#fffaf3",
+              borderRadius: 24,
+              padding: 28,
+              boxShadow: "0 24px 80px rgba(0,0,0,.2)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
               <div>
-                <span className="eyebrow">WELCOME BACK</span>
-                <h2 id="login-title" style={{ margin: "8px 0 4px" }}>Your happy-paws account</h2>
-                <p style={{ margin: 0, color: "#687568" }}>Log in to access your shopping cart.</p>
+                <span className="eyebrow">
+                  {authView === "login"
+                    ? "WELCOME BACK"
+                    : authView === "register"
+                      ? "JOIN PAW PANTRY"
+                      : authView === "forgot-password"
+                        ? "ACCOUNT RECOVERY"
+                        : "CREATE NEW PASSWORD"}
+                </span>
+
+                <h2 id="login-title" style={{ margin: "8px 0 4px" }}>
+                  {authView === "login"
+                    ? "Your happy-paws account"
+                    : authView === "register"
+                      ? "Create your account"
+                      : authView === "forgot-password"
+                        ? "Forgot your password?"
+                        : "Reset your password"}
+                </h2>
+
+                <p style={{ margin: 0, color: "#687568" }}>
+                  {authView === "login"
+                    ? "Log in to access your shopping cart."
+                    : authView === "register"
+                      ? "Create an account and make every tail wag."
+                      : authView === "forgot-password"
+                        ? "Enter your email address to receive a reset link."
+                        : "Enter and confirm your new password."}
+                </p>
               </div>
-              <button className="icon-button" aria-label="Close login" onClick={() => setLoginOpen(false)}><X size={18} /></button>
+
+              <button
+                className="icon-button"
+                aria-label="Close login"
+                onClick={() => {
+                if (window.location.pathname === "/reset-password") {
+                  window.history.replaceState({}, document.title, "/");
+                }
+
+                setLoginOpen(false);
+              }}
+              >
+                <X size={18} />
+              </button>
             </div>
-            <form onSubmit={handleLogin} style={{ display: "grid", gap: 14, marginTop: 24 }}>
+
+            {/* LOGIN FORM */}
+            {authView === "login" && (
+              <form
+                onSubmit={handleLogin}
+                style={{ display: "grid", gap: 14, marginTop: 24 }}
+              >
+                <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+                  Email address
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={loginEmail}
+                    onChange={(event) => setLoginEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      border: "1px solid #d8dfd1",
+                      borderRadius: 12,
+                      padding: "12px 14px",
+                      background: "white",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+                  Password
+                  <input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={loginPassword}
+                    onChange={(event) => setLoginPassword(event.target.value)}
+                    placeholder="Your password"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      border: "1px solid #d8dfd1",
+                      borderRadius: 12,
+                      padding: "12px 14px",
+                      background: "white",
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(loginEmail);
+                    setAuthView("forgot-password");
+                  }}
+                  style={{
+                    justifySelf: "end",
+                    border: "none",
+                    background: "transparent",
+                    color: "#55744f",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    padding: 0,
+                  }}
+                >
+                  Forgot password?
+                </button>
+
+                <button
+                  className="button button-dark"
+                  type="submit"
+                  disabled={cartLoading}
+                >
+                  {cartLoading ? "Signing in..." : "Log in to Paw Pantry"}
+                </button>
+
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    onClick={() => {
+                      setNotice("");
+                      setAuthView("register");
+                    }}
+                  >
+                    Create an account
+                  </button>
+
+                {isLoggedIn && (
+                  <button
+                    className="button button-outline"
+                    type="button"
+                    onClick={handleLogout}
+                  >
+                    Log out
+                  </button>
+                )}
+              </form>
+            )}
+
+            {/* FORGOT PASSWORD FORM */}
+            {authView === "forgot-password" && (
+              <form
+                onSubmit={handleForgotPassword}
+                style={{ display: "grid", gap: 14, marginTop: 24 }}
+              >
+                <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+                  Email address
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={resetEmail}
+                    onChange={(event) => setResetEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      border: "1px solid #d8dfd1",
+                      borderRadius: 12,
+                      padding: "12px 14px",
+                      background: "white",
+                    }}
+                  />
+                </label>
+
+                <button className="button button-dark" type="submit">
+                  Send reset link
+                </button>
+
+                <button
+                  className="button button-outline"
+                  type="button"
+                  onClick={() => setAuthView("login")}
+                >
+                  Back to login
+                </button>
+              </form>
+            )}
+            {/* REGISTER FORM */}
+          {authView === "register" && (
+            <form
+              onSubmit={handleRegister}
+              style={{ display: "grid", gap: 14, marginTop: 24 }}
+            >
+              <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+                Full name
+                <input
+                  type="text"
+                  required
+                  maxLength={160}
+                  autoComplete="name"
+                  value={registerName}
+                  onChange={(event) => setRegisterName(event.target.value)}
+                  placeholder="Your full name"
+                  style={checkoutInputStyle}
+                />
+              </label>
+
               <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
                 Email address
-                <input type="email" required autoComplete="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} placeholder="you@example.com" style={{ width: "100%", boxSizing: "border-box", border: "1px solid #d8dfd1", borderRadius: 12, padding: "12px 14px", background: "white" }} />
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={registerEmail}
+                  onChange={(event) => setRegisterEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  style={checkoutInputStyle}
+                />
               </label>
+
               <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
                 Password
-                <input type="password" required autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} placeholder="Your password" style={{ width: "100%", boxSizing: "border-box", border: "1px solid #d8dfd1", borderRadius: 12, padding: "12px 14px", background: "white" }} />
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  value={registerPassword}
+                  onChange={(event) => setRegisterPassword(event.target.value)}
+                  placeholder="Create a password"
+                  style={checkoutInputStyle}
+                />
               </label>
-              <button className="button button-dark" type="submit" disabled={cartLoading}>{cartLoading ? "Signing in..." : "Log in to Paw Pantry"}</button>
-              {isLoggedIn && <button className="button button-outline" type="button" onClick={handleLogout}>Log out</button>}
+
+              <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+                Confirm password
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  value={registerConfirmPassword}
+                  onChange={(event) => setRegisterConfirmPassword(event.target.value)}
+                  placeholder="Confirm your password"
+                  style={checkoutInputStyle}
+                />
+              </label>
+
+              <button
+                className="button button-dark"
+                type="submit"
+                disabled={cartLoading}
+              >
+                {cartLoading ? "Creating account..." : "Create account"}
+              </button>
+
+              <button
+                className="button button-outline"
+                type="button"
+                onClick={() => {
+                  setNotice("");
+                  setAuthView("login");
+                }}
+              >
+                Already have an account? Log in
+              </button>
             </form>
+          )}
+            {/* RESET PASSWORD FORM */}
+            {authView === "reset-password" && (
+              <form
+                onSubmit={handleResetPassword}
+                style={{ display: "grid", gap: 14, marginTop: 24 }}
+              >
+                <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+                  New password
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    placeholder="Enter new password"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      border: "1px solid #d8dfd1",
+                      borderRadius: 12,
+                      padding: "12px 14px",
+                      background: "white",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+                  Confirm new password
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    placeholder="Confirm new password"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      border: "1px solid #d8dfd1",
+                      borderRadius: 12,
+                      padding: "12px 14px",
+                      background: "white",
+                    }}
+                  />
+                </label>
+
+                <button className="button button-dark" type="submit">
+                  Reset password
+                </button>
+
+                <button
+                  className="button button-outline"
+                  type="button"
+                  onClick={() => setAuthView("login")}
+                >
+                  Back to login
+                </button>
+              </form>
+            )}
           </section>
         </div>
       )}
-
 
       {ordersOpen && (
         <div

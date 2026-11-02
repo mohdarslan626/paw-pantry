@@ -77,6 +77,32 @@ export async function loginUser(
   return result;
 }
 
+export type PasswordResetResponse = {
+  message: string;
+};
+
+export async function requestPasswordReset(
+  email: string,
+): Promise<PasswordResetResponse> {
+  return apiRequest<PasswordResetResponse>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<PasswordResetResponse> {
+  return apiRequest<PasswordResetResponse>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({
+      token,
+      new_password: newPassword,
+    }),
+  });
+}
+
 export async function registerUser(data: {
   email: string;
   password: string;
