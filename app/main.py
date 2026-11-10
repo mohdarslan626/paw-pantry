@@ -20,6 +20,10 @@ from app.api.v1.cart import router as cart_router
 from app.api.v1.orders import router as orders_router
 from app.api.v1.addresses import router as addresses_router
 from app.api.v1.media import router as media_router
+from app.api.v1.product_images import router as product_images_router
+from app.api.v1.ingredients import router as ingredients_router
+from app.api.v1.product_composition import router as product_composition_router
+from app.api.v1.inventory import router as inventory_router
 
 configure_logging()
 logger = logging.getLogger("app")
@@ -102,6 +106,26 @@ app.include_router(
 
 app.include_router(
     media_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    product_images_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    ingredients_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    product_composition_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    inventory_router,
     prefix="/api/v1",
 )
 

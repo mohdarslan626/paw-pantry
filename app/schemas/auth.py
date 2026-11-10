@@ -14,6 +14,7 @@ class UserResponse(BaseModel):
     id: UUID
     email: EmailStr
     display_name: str | None
+    roles: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 

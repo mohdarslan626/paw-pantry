@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import "./App.css";
 
+import AdminApp from "./AdminApp";
 import {
   addCartItem,
   getCart,
@@ -201,7 +202,7 @@ function ProductPack({ product }: { product: Product }) {
   );
 }
 
-function App() {
+function StorefrontApp() {
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
@@ -1673,5 +1674,8 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  if (window.location.pathname.startsWith("/admin")) return <AdminApp />;
+  return <StorefrontApp />;
+}
 

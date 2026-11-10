@@ -83,8 +83,25 @@ def list_my_orders(
     )
     return db.scalars(statement).all()
 
+@router.get("/admin", response_model=list[OrderHistoryResponse])
+def list_all_orders_admin(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    statement = (
+        select(Order)
+        .where(Order.deleted_at.is_(None))
+        .options(selectinload(Order.items))
+        .order_by(Order.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
 
-@router.get("/{order_id}", response_model=OrderDetailResponse)
+    return db.scalars(statement).all()
+
+@router.get("/{order_id:uuid}", response_model=OrderDetailResponse)
 def get_my_order(
     order_id: UUID,
     db: Session = Depends(get_db),

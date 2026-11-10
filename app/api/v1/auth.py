@@ -69,7 +69,16 @@ def login(
 def get_my_profile(
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
-    return current_user
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        display_name=current_user.display_name,
+        roles=[
+            role.name.strip().lower()
+            for role in current_user.roles
+            if role.deleted_at is None
+        ],
+    )
 
 
 @router.post(
