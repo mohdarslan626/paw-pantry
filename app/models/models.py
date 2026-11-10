@@ -35,6 +35,19 @@ class ContentStatus(str, enum.Enum):
 class MediaStatus(str, enum.Enum):
     PENDING="pending"; READY="ready"; FAILED="failed"; RETIRED="retired"
 
+class ProductFulfillmentType(str, enum.Enum):
+    INTERNAL = "internal"
+    EXTERNAL_LINK = "external_link"
+
+class ProductMarketplace(str, enum.Enum):
+    AMAZON = "amazon"
+    FLIPKART = "flipkart"
+    OTHER = "other"
+
+class StorageBackendType(str, enum.Enum):
+    LOCAL = "local"
+    S3 = "s3"
+
 class User(Base, AuditMixin):
     __tablename__="users"
     __table_args__=(Index("uq_users_email_active","email_normalized",unique=True,postgresql_where=text("deleted_at IS NULL")),)
@@ -124,14 +137,32 @@ class Product(Base, AuditMixin):
     slug: Mapped[str]=mapped_column(String(260),nullable=False)
     short_description: Mapped[Optional[str]]=mapped_column(String(500))
     description: Mapped[Optional[str]]=mapped_column(Text)
+    fulfillment_type: Mapped[ProductFulfillmentType]=mapped_column(
+        Enum(ProductFulfillmentType,name="product_fulfillment_type",values_callable=lambda enum_cls: [member.value for member in enum_cls]),
+        default=ProductFulfillmentType.INTERNAL,nullable=False,
+    )
+    external_url: Mapped[Optional[str]]=mapped_column(String(2048))
+    external_marketplace: Mapped[Optional[ProductMarketplace]]=mapped_column(
+        Enum(ProductMarketplace,name="product_marketplace",values_callable=lambda enum_cls: [member.value for member in enum_cls]),
+        nullable=True,
+    )
     status: Mapped[ProductStatus]=mapped_column(Enum(ProductStatus,name="product_status", values_callable=lambda enum_cls: [member.value for member in enum_cls],),default=ProductStatus.DRAFT,nullable=False)
     published_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True))
     brand: Mapped[Optional[Brand]]=relationship(back_populates="products")
     category: Mapped[Category]=relationship(back_populates="products")
     variants: Mapped[List["ProductVariant"]]=relationship(back_populates="product",foreign_keys="ProductVariant.product_id")
-    images: Mapped[List["ProductImage"]]=relationship(back_populates="product",order_by="ProductImage.position")
-    ingredients: Mapped[List["ProductIngredient"]]=relationship(back_populates="product")
-    nutrition: Mapped[List["NutritionalAnalysis"]]=relationship(back_populates="product")
+    images: Mapped[List["ProductImage"]]=relationship(
+        back_populates="product",order_by="ProductImage.position",
+        primaryjoin="and_(Product.id == ProductImage.product_id, ProductImage.deleted_at.is_(None))",
+    )
+    ingredients: Mapped[List["ProductIngredient"]]=relationship(
+        back_populates="product",
+        primaryjoin="and_(Product.id == ProductIngredient.product_id, ProductIngredient.deleted_at.is_(None))",
+    )
+    nutrition: Mapped[List["NutritionalAnalysis"]]=relationship(
+        back_populates="product",
+        primaryjoin="and_(Product.id == NutritionalAnalysis.product_id, NutritionalAnalysis.deleted_at.is_(None))",
+    )
     reviews: Mapped[List["Review"]]=relationship(back_populates="product")
 class ProductVariant(Base, AuditMixin):
     __tablename__="product_variants"
@@ -205,6 +236,10 @@ class MediaAsset(Base, AuditMixin):
     size_bytes: Mapped[int]=mapped_column(BigInteger,nullable=False)
     checksum_sha256: Mapped[Optional[str]]=mapped_column(String(64))
     status: Mapped[MediaStatus]=mapped_column(Enum(MediaStatus,name="media_status", values_callable=lambda enum_cls: [member.value for member in enum_cls],),default=MediaStatus.PENDING,nullable=False)
+    storage_backend: Mapped[StorageBackendType]=mapped_column(
+        Enum(StorageBackendType,name="storage_backend_type",values_callable=lambda enum_cls: [member.value for member in enum_cls]),
+        default=StorageBackendType.LOCAL,nullable=False,
+    )
     alt_text: Mapped[Optional[str]]=mapped_column(String(255))
     product_links: Mapped[List["ProductImage"]]=relationship(back_populates="media_asset")
 class ProductImage(Base, AuditMixin):

@@ -82,3 +82,43 @@ class ProductResponse(BaseModel):
     variants: list[ProductVariantResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+class MediaAssetSummary(BaseModel):
+    id: UUID
+    object_key: str
+    mime_type: str
+    status: str
+    url: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductImageResponse(BaseModel):
+    id: UUID
+    media_asset_id: UUID
+    alt_text: str | None
+    position: int
+    is_primary: bool
+    media_asset: MediaAssetSummary
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductIngredientResponse(BaseModel):
+    id: UUID
+    ingredient_id: int
+    percentage: Decimal | None
+    display_order: int
+    ingredient_name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NutritionalAnalysisResponse(BaseModel):
+    id: UUID
+    nutrient_code: str
+    value: Decimal
+    unit: str
+    basis: str
+
+    model_config = ConfigDict(from_attributes=True)
